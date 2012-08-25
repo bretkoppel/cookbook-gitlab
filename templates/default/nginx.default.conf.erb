@@ -13,9 +13,9 @@ upstream unicorn_rails {
 }
 
 server {
-    listen       80;
+    listen 80;
     client_max_body_size 4G;
-    server_name  _;
+    server_name <%= node['hostname'] %>;
 
     access_log  /var/log/nginx/<%= node['hostname'] %>.access.log  combined;
 
