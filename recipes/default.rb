@@ -25,17 +25,17 @@
   include_recipe requirement
 end
 
+# Drop off a profile script.
+template "/etc/profile.d/gitlab.sh" do
+  owner "root"
+  group "root"
+  mode 0755
+end
+
 # There are problems deploying on Redhat provided rubies.
 # We'll use Fletcher Nichol's slick ruby_build cookbook to compile a Ruby.
 if node['gitlab']['install_ruby'] !~ /package/
   ruby_build_ruby node['gitlab']['install_ruby'] 
-
-  # Drop off a profile script.
-  template "/etc/profile.d/gitlab.sh" do
-    owner "root"
-    group "root"
-    mode 0755
-  end
 
   # Set PATH for remainder of recipe.
   ENV['PATH'] = "/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin:/usr/local/ruby/#{node['gitlab']['install_ruby']}/bin"
@@ -97,12 +97,13 @@ gitlab_sshkey = SSHKey.generate(:type => 'RSA', :comment => "#{node['gitlab']['u
 node.set_unless['gitlab']['public_key'] = gitlab_sshkey.ssh_public_key
 
 # Save public_key to node, unless it is already set.
-ruby_block "save node data" do
-  block do
-    node.save
+unless Chef::Config[:solo]
+  ruby_block "save node data" do
+    block do
+      node.save
+    end
+    action :create
   end
-  not_if { Chef::Config[:solo] }
-  action :create
 end
 
 # Render private key template
@@ -183,6 +184,23 @@ execute "gitlab-bundle-install" do
   not_if { File.exists?("#{node['gitlab']['app_home']}/vendor/bundle") }
 end
 
+# Create a $HOME/gitlab/tmp folder
+# see https://github.com/gitlabhq/gitlabhq/issues/1038
+directory "#{node['gitlab']['app_home']}/tmp" do
+  owner node['gitlab']['user']
+  group node['gitlab']['group']
+  mode 0755
+  not_if { File.exists?("#{node['gitlab']['app_home']}/tmp") }
+end
+
+# Create a $HOME/gitlab/tmp/sockets folder
+directory "#{node['gitlab']['app_home']}/tmp/sockets" do
+  owner node['gitlab']['user']
+  group node['gitlab']['group']
+  mode 0777
+  not_if { File.exists?("#{node['gitlab']['app_home']}/tmp/sockets") }
+end
+
 # Setup sqlite database for Gitlab
 execute "gitlab-bundle-rake" do
   command "bundle exec rake gitlab:app:setup RAILS_ENV=production"
@@ -205,6 +223,11 @@ template "/etc/init.d/unicorn_rails" do
   group "root"
   mode 0755
   source "unicorn_rails.init.erb"
+end
+
+# Disable the default nginx site so that we serve gitlab
+execute "nginx-default-disable" do
+  command "rm /etc/nginx/sites-enabled/default"
 end
 
 # Start unicorn_rails and nginx service
