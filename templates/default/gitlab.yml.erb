@@ -2,6 +2,18 @@
 # Local modifications will be overwritten.
 
 # Gitlab application config file
+web:
+  host: <%= node['hostname'] %>
+  port: 80
+  https: false
+
+# Application specific settings
+# Like default project limit for user etc
+app:
+  default_projects_limit: 100
+  # backup_path: "/vol/backups" # default: Rails.root + backups/
+  # backup_keep_time: 604800 # default: 0 (forever) (in seconds)
+  # disable_gravatar: true # default: false - Disable user avatars from Gravatar.com
 
 # Email used for notification
 # about new issues, comments
